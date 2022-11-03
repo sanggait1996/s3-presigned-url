@@ -4,7 +4,15 @@
 -   start project
     npm start
 
+Docker image:
 
-user guide: for testing
+sudo docker run -p 80:3000 s3-presigned-url:latest
 
-- after run project, use this url "http://localhost:3000/get-presigned-url-for-upload" to get presigned url 
+-   How to get Presigned url
+
+    -   domain:port/get-presigned-url-for-upload
+
+        Body: there are two params in body
+
+        -   prefix: ...
+        -   userId: ...
