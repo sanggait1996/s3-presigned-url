@@ -4,8 +4,10 @@ const port = 3000;
 const AWS = require('aws-sdk');
 require('dotenv').config();
 const { v4: uuidv4 } = require('uuid');
+const bodyParser = require('body-parser');
 
 app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
 const s3 = new AWS.S3({
     accessKeyId: process.env.ACCESS_KEY,
@@ -16,11 +18,44 @@ const s3 = new AWS.S3({
 });
 
 app.post('/get-presigned-url-for-upload', async (req, res) => {
+    const fileName = req.body.fileName;
+    const userId = req.body.userId;
+    const prefix = req.body.prefix;
+    let extension = '';
+
+    // validation data
+    try {
+        if (userId === undefined) throw 'userId is required.';
+        if (prefix === undefined) throw 'prefix is required.';
+        if (fileName === undefined) {
+            throw 'fileName is required.';
+        } else {
+            extension = fileName.split('.')[1];
+            const validImageExtensions = [
+                'jpg',
+                'jpeg',
+                'bmp',
+                'gif',
+                'png',
+                'jpg',
+            ];
+            if (!validImageExtensions.includes(extension))
+                throw `${fileName} is not an image.`;
+        }
+    } catch (err) {
+        console.log(err);
+        return res.status(400).send({
+            success: false,
+            message: err,
+        });
+    }
+
+    const newFileName = `${uuidv4()}.${extension}`;
     const params = {
         Bucket: 's3.stripical.xyz',
-        Key: `${req.body.prefix}/${req.body.userId}/${uuidv4()}.jpg`,
+        Key: `${req.body.prefix}/${req.body.userId}/${newFileName}`,
         Expires: 60 * 5,
-        ContentType: 'image/jpg',
+        ContentType: `image/${extension}`,
     };
     try {
         const url = await new Promise((resolve, reject) => {
@@ -28,30 +63,27 @@ app.post('/get-presigned-url-for-upload', async (req, res) => {
                 err ? reject(err) : resolve(url);
             });
         });
+        console.log(`Genarated an url: ${url}`);
+        console.log(`Generated an url with filename: ${newFileName}`);
+        console.log(`generated an pre-signed url at: ${new Date()}`);
 
-        res.send({
+        res.status(200).send({
+            success: true,
             url: url,
-            userId: req.body.userId,
-            prefix: req.body.prefix,
+            userId: userId,
+            prefix: prefix,
+            fileName: fileName,
         });
     } catch (err) {
         if (err) {
             console.log(err);
+            return res.send(500).send({
+                success: false,
+                message: err,
+            });
         }
     }
 });
-
-// app.get('/get-url-image-access', (req, res) => {
-//     var params = {
-//         Bucket: process.env.BUCKET_NAME,
-//         Key: 'avatar/USER001/95a8ee4f-651b-451a-ad10-eb41feb4a680.jpg',
-//     };
-//     s3.getSignedUrl('getObject', params, (error, data) => {
-//         console.log(error);
-//         console.log(data);
-//         res.send(data);
-//     });
-// });
 
 app.get('/', (req, res) => {
     res.send('Hello World!');
